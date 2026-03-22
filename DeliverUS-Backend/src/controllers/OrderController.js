@@ -87,7 +87,29 @@ const indexRestaurant = async function (req, res) {
 // Orders have to include products that belongs to each order and restaurant details
 // sort them by createdAt date, desc.
 const indexCustomer = async function (req, res) {
-  res.status(500).send('This function is to be implemented')
+  try {
+    const orders = await Order.findAll({
+      where: {
+        userId: req.user.id
+      },
+      include: [
+        {
+          model: Product,
+          as: 'products'
+        },
+        {
+          model: Restaurant,
+          as: 'restaurant'
+        }
+      ],
+      order: [
+        ['createdAt', 'DESC']
+      ]
+    })
+    res.json(orders)
+  } catch (err) {
+    res.status(500).send(err)
+  }
 }
 
 // TODO: Implement the create function that receives a new order and stores it in the database.
@@ -117,7 +139,18 @@ const update = async function (req, res) {
 // Take into account that:
 // 1. The migration include the "ON DELETE CASCADE" directive so OrderProducts related to this order will be automatically removed.
 const destroy = async function (req, res) {
-  res.status(500).send('This function is to be implemented')
+  try {
+    const result = await Order.destroy({ where: { id: req.params.orderId } })
+    let message = ''
+    if (result === 1) {
+      message = 'Sucessfuly deleted order id.' + req.params.orderId
+    } else {
+      message = 'Could not delete order.'
+    }
+    res.json(message)
+  } catch (err) {
+    res.status(500).send(err)
+  }
 }
 
 const confirm = async function (req, res) {

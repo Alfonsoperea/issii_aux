@@ -15,12 +15,12 @@ const loadFileRoutes = function (app) {
   app.route('/orders')
     .get(
       isLoggedIn,
-      hasRole('costumer'),
+      hasRole('customer'),
       OrderController.indexCustomer
     )
     .post(
       isLoggedIn,
-      hasRole('costumer'),
+      hasRole('customer'),
       OrderValidation.create,
       handleValidation,
       OrderController.create
@@ -63,7 +63,7 @@ const loadFileRoutes = function (app) {
       OrderController.show)
     .put(
       isLoggedIn,
-      hasRole('costumer'),
+      hasRole('customer'),
       OrderMiddleware.checkOrderCustomer,
       checkEntityExists(Order, 'orderId'),
       OrderValidation.update,
@@ -72,7 +72,7 @@ const loadFileRoutes = function (app) {
     )
     .delete(
       isLoggedIn,
-      hasRole('costumer'),
+      hasRole('customer'),
       OrderMiddleware.checkOrderCustomer,
       checkEntityExists(Order, 'orderId'),
       OrderMiddleware.checkOrderIsPending,
