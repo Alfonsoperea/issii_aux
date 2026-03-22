@@ -3,8 +3,11 @@
 // 2. Check that products is a non-empty array composed of objects with productId and quantity greater than 0
 // 3. Check that products are available
 // 4. Check that all the products belong to the same restaurant
-const create = [
 
+
+const create = [
+    check('restaurantId').exists().isInt({ min: 1 }).toInt(),
+  check('restaurantId').custom(checkRestaurantExists),
 ]
 // TODO: Include validation rules for update that should:
 // 1. Check that restaurantId is NOT present in the body.

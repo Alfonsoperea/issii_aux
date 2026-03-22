@@ -6,8 +6,9 @@ import { Order } from '../models/models.js'
 
 const loadFileRoutes = function (app) {
   // TODO: Include routes for:
-  // 1. Retrieving orders from current logged-in customer
-  // 2. Creating a new order (only customers can create new orders)
+  // 1. Retrieving orders from current logged-in customer --Un get de los orders del usuario logeado
+  // 2. Creating a new order (only customers can create new orders) -- Un create de order solo para customers
+
 
   app.route('/orders/:orderId/confirm')
     .patch(
