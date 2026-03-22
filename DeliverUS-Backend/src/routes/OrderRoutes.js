@@ -1,13 +1,29 @@
+import * as OrderValidation from '../controllers/validation/OrderValidation.js'
 import OrderController from '../controllers/OrderController.js'
 import { hasRole, isLoggedIn } from '../middlewares/AuthMiddleware.js'
 import { checkEntityExists } from '../middlewares/EntityMiddleware.js'
 import * as OrderMiddleware from '../middlewares/OrderMiddleware.js'
+import { handleValidation } from '../middlewares/ValidationHandlingMiddleware.js'
 import { Order } from '../models/models.js'
 
 const loadFileRoutes = function (app) {
   // TODO: Include routes for:
   // 1. Retrieving orders from current logged-in customer
   // 2. Creating a new order (only customers can create new orders)
+
+  app.route('/orders')
+    .get(
+      isLoggedIn,
+      hasRole('costumer'),
+      OrderController.indexCustomer
+    )
+    .post(
+      isLoggedIn,
+      hasRole('costumer'),
+      OrderValidation.create,
+      handleValidation,
+      OrderController.create
+    )
 
   app.route('/orders/:orderId/confirm')
     .patch(
@@ -44,6 +60,23 @@ const loadFileRoutes = function (app) {
       checkEntityExists(Order, 'orderId'),
       OrderMiddleware.checkOrderVisible,
       OrderController.show)
+    .put(
+      isLoggedIn,
+      hasRole('costumer'),
+      OrderMiddleware.checkOrderCustomer,
+      checkEntityExists(Order, 'orderId'),
+      OrderValidation.update,
+      handleValidation,
+      OrderController.update
+    )
+    .delete(
+      isLoggedIn,
+      hasRole('costumer'),
+      OrderMiddleware.checkOrderCustomer,
+      checkEntityExists(Order, 'orderId'),
+      OrderMiddleware.checkOrderIsPending,
+      OrderController.destroy
+    )
 }
 
 export default loadFileRoutes
