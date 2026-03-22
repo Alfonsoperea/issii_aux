@@ -66,6 +66,7 @@ const loadFileRoutes = function (app) {
       hasRole('customer'),
       OrderMiddleware.checkOrderCustomer,
       checkEntityExists(Order, 'orderId'),
+      OrderMiddleware.checkOrderIsPending,
       OrderValidation.update,
       handleValidation,
       OrderController.update
