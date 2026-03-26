@@ -4,6 +4,9 @@ import { Order, Restaurant, Product } from '../models/models.js'
 const checkOrderCustomer = async (req, res, next) => {
   try {
     const order = await Order.findByPk(req.params.orderId)
+    if (!order) {
+      return res.status(404).send('Not found')
+    }
     if (req.user.id === order.userId) {
       return next()
     } else {
@@ -51,12 +54,12 @@ const checkRestaurantExists = async (req, res, next) => {
   try {
     const restaurant = await Restaurant.findByPk(req.body.restaurantId)
     if (restaurant === null) {
-      return res.status(404).send('The restaurantId does not exist.')
-    } next()  
+      return res.status(409).send('The restaurantId does not exist.')
+    }
+    return next()
   } catch (err) {
     return res.status(500).send(err.message)
   }
-  return next()
 }
 
 const checkOrderOwnership = async (req, res, next) => {

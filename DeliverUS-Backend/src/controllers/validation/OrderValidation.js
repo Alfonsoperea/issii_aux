@@ -1,6 +1,62 @@
 import { check } from 'express-validator'
-import { checkRestaurantExists, checkProductsAvailable, checkProductsSameRestaurant } from '../../middlewares/OrderMiddleware.js'
-import { Product } from '../../models/models.js'
+import { Order, Product } from '../../models/models.js'
+
+const checkProductsAvailable = async (value, { req }) => {
+  try {
+    const products = await Product.findAll({
+      where: { id: req.body.products.map(product => product.productId) }
+    })
+    if (products.length !== req.body.products.length) {
+      return Promise.reject(new Error('Some products do not exist.'))
+    }
+    if (products.some(product => !product.availability)) {
+      return Promise.reject(new Error('Some products are not available.'))
+    }
+    return Promise.resolve()
+  } catch (err) {
+    return Promise.reject(new Error(err))
+  }
+}
+
+const checkProductsSameRestaurant = async (value, { req }) => {
+  try {
+    const products = await Product.findAll({
+      where: { id: req.body.products.map(product => product.productId) }
+    })
+    if (products.length !== req.body.products.length) {
+      return Promise.reject(new Error('Some products do not exist.'))
+    }
+    const restaurantIds = [...new Set(products.map(product => product.restaurantId))]
+    if (restaurantIds.length !== 1) {
+      return Promise.reject(new Error('All products must belong to the same restaurant.'))
+    }
+    if (restaurantIds[0] !== req.body.restaurantId) {
+      return Promise.reject(new Error('Products do not belong to selected restaurant.'))
+    }
+    return Promise.resolve()
+  } catch (err) {
+    return Promise.reject(new Error(err))
+  }
+}
+
+const checkProductsSameRestaurantAsOrder = async (value, { req }) => {
+  try {
+    const order = await Order.findByPk(req.params.orderId)
+    const products = await Product.findAll({
+      where: { id: req.body.products.map(product => product.productId) }
+    })
+    if (products.length !== req.body.products.length) {
+      return Promise.reject(new Error('Some products do not exist.'))
+    }
+    const restaurantIds = [...new Set(products.map(product => product.restaurantId))]
+    if (restaurantIds.length !== 1 || restaurantIds[0] !== order.restaurantId) {
+      return Promise.reject(new Error('All products must belong to order restaurant.'))
+    }
+    return Promise.resolve()
+  } catch (err) {
+    return Promise.reject(new Error(err))
+  }
+}
 
 // TODO: Include validation rules for create that should:
 // 1. Check that restaurantId is present in the body and corresponds to an existing restaurant
@@ -9,21 +65,14 @@ import { Product } from '../../models/models.js'
 // 4. Check that all the products belong to the same restaurant
 
 const create = [
-    check('createdAt').exists().isDate().toDate(),
-    check('startedAt').optional({ nullable: true }).toDate(),
-    check('sentAt').optional({ nullable: true }).toDate(),
-    check('deliveredAt').optional({ nullable: true }).toDate(),
-    check('price').exists().isFloat({ min: 0 }).toFloat(),
-    check('address').exists().isString().isLength({ min: 1 }).trim(),
-    check('shippingCosts').exists().isFloat({ min: 0 }).toFloat(),
-    check('restaurantId').exists().isInt({ min: 1 }).toInt(),
-    check('restaurantId').custom(checkRestaurantExists),
-    check('userId').not().exists(),
-    check('products').isArray({ min: 1 }),
-    check('products.*.productId').exists().isInt({ min: 1 }).toInt(),
-    check('products.*.quantity').exists().isInt({ min: 1 }).toInt(), 
-    check('products').custom(checkProductsAvailable),
-    check('products').custom(checkProductsSameRestaurant)
+  check('address').exists().isString().isLength({ min: 1, max: 255 }).trim(),
+  check('restaurantId').exists(),
+  check('userId').not().exists(),
+  check('products').exists().isArray({ min: 1 }),
+  check('products.*.productId').exists().isInt({ min: 1 }).toInt(),
+  check('products.*.quantity').exists().isInt({ min: 1 }).toInt(),
+  check('products').custom(checkProductsAvailable),
+  check('products').custom(checkProductsSameRestaurant)
 ]
 // TODO: Include validation rules for update that should:
 // 1. Check that restaurantId is NOT present in the body.
@@ -32,20 +81,14 @@ const create = [
 // 4. Check that all the products belong to the same restaurant of the originally saved order that is being edited.
 // 5. Check that the order is in the 'pending' state.
 const update = [
-    check('createdAt').exists().isDate().toDate(),
-    check('startedAt').optional({ nullable: true }).toDate(),
-    check('sentAt').optional({ nullable: true }).toDate(),
-    check('deliveredAt').optional({ nullable: true }).toDate(),
-    check('price').exists().isFloat({ min: 0 }).toFloat(),
-    check('address').exists().isString().isLength({ min: 1 }).trim(),
-    check('shippingCosts').exists().isFloat({ min: 0 }).toFloat(),
-    check('restaurantId').not().exists(),
-    check('userId').not().exists(),
-    check('products').isArray({ min: 1 }),
-    check('products.*.productId').exists().isInt({ min: 1 }).toInt(),
-    check('products.*.quantity').exists().isInt({ min: 1 }).toInt(), 
-    check('products').custom(checkProductsAvailable),
-    check('products').custom(checkProductsSameRestaurant)
+  check('address').exists().isString().isLength({ min: 1, max: 255 }).trim(),
+  check('restaurantId').not().exists(),
+  check('userId').not().exists(),
+  check('products').exists().isArray({ min: 1 }),
+  check('products.*.productId').exists().isInt({ min: 1 }).toInt(),
+  check('products.*.quantity').exists().isInt({ min: 1 }).toInt(),
+  check('products').custom(checkProductsAvailable),
+  check('products').custom(checkProductsSameRestaurantAsOrder)
 ]
 
 export { create, update }

@@ -21,6 +21,7 @@ const loadFileRoutes = function (app) {
     .post(
       isLoggedIn,
       hasRole('customer'),
+      OrderMiddleware.checkRestaurantExists,
       OrderValidation.create,
       handleValidation,
       OrderController.create
@@ -64,8 +65,8 @@ const loadFileRoutes = function (app) {
     .put(
       isLoggedIn,
       hasRole('customer'),
-      OrderMiddleware.checkOrderCustomer,
       checkEntityExists(Order, 'orderId'),
+      OrderMiddleware.checkOrderCustomer,
       OrderMiddleware.checkOrderIsPending,
       OrderValidation.update,
       handleValidation,
@@ -74,8 +75,8 @@ const loadFileRoutes = function (app) {
     .delete(
       isLoggedIn,
       hasRole('customer'),
-      OrderMiddleware.checkOrderCustomer,
       checkEntityExists(Order, 'orderId'),
+      OrderMiddleware.checkOrderCustomer,
       OrderMiddleware.checkOrderIsPending,
       OrderController.destroy
     )
