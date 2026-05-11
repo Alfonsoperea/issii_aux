@@ -120,61 +120,8 @@ const indexCustomer = async function (req, res) {
 // 4. If an exception is raised, catch it and rollback the transaction
 
 const create = async (req, res) => {
-  const transaction = await sequelizeSession.transaction()
-  try {
-    const restaurant = await Restaurant.findByPk(req.body.restaurantId, { transaction })
-    const productIds = req.body.products.map(product => product.productId)
-    const products = await Product.findAll({ where: { id: productIds }, transaction })
-
-    if (products.length !== productIds.length) {
-      await transaction.rollback()
-      return res.status(409).send('Some products do not exist')
-    }
-
-    const productsById = new Map(products.map(product => [product.id, product]))
-    let totalProductsPrice = 0
-    for (const line of req.body.products) {
-      const product = productsById.get(line.productId)
-      totalProductsPrice += product.price * line.quantity
-    }
-
-    const shippingCosts = totalProductsPrice > 10 ? 0 : restaurant.shippingCosts
-    const orderPrice = totalProductsPrice + shippingCosts
-
-    const createdOrder = await Order.create({
-      address: req.body.address,
-      restaurantId: req.body.restaurantId,
-      userId: req.user.id,
-      shippingCosts,
-      price: orderPrice
-    }, { transaction })
-
-    for (const line of req.body.products) {
-      const product = productsById.get(line.productId)
-      await createdOrder.addProduct(product, {
-        through: {
-          quantity: line.quantity,
-          unityPrice: product.price
-        },
-        transaction
-      })
-    }
-
-    await transaction.commit()
-
-    const fullOrder = await Order.findByPk(createdOrder.id, {
-      include: [
-        {
-          model: Product,
-          as: 'products'
-        }
-      ]
-    })
-    return res.json(fullOrder)
-  } catch (err) {
-    await transaction.rollback()
-    return res.status(500).send(err)
-  }
+  // Use sequelizeSession to start a transaction
+  res.status(500).send('This function is to be implemented')
 }
 
 // TODO: Implement the update function that receives a modified order and persists it in the database.
@@ -184,62 +131,8 @@ const create = async (req, res) => {
 // 3. In order to save the updated order and updated products, start a transaction, update the order, remove the old related OrderProducts and store the new product lines, and commit the transaction
 // 4. If an exception is raised, catch it and rollback the transaction
 const update = async function (req, res) {
-  const transaction = await sequelizeSession.transaction()
-  try {
-    const order = await Order.findByPk(req.params.orderId, { transaction })
-    const restaurant = await Restaurant.findByPk(order.restaurantId, { transaction })
-    const productIds = req.body.products.map(product => product.productId)
-    const products = await Product.findAll({ where: { id: productIds }, transaction })
-
-    if (products.length !== productIds.length) {
-      await transaction.rollback()
-      return res.status(409).send('Some products do not exist')
-    }
-
-    const productsById = new Map(products.map(product => [product.id, product]))
-    let totalProductsPrice = 0
-    for (const line of req.body.products) {
-      const product = productsById.get(line.productId)
-      totalProductsPrice += product.price * line.quantity
-    }
-
-    const shippingCosts = totalProductsPrice > 10 ? 0 : restaurant.shippingCosts
-    const orderPrice = totalProductsPrice + shippingCosts
-
-    await order.update({
-      address: req.body.address,
-      shippingCosts,
-      price: orderPrice
-    }, { transaction })
-
-    await order.setProducts([], { transaction })
-
-    for (const line of req.body.products) {
-      const product = productsById.get(line.productId)
-      await order.addProduct(product, {
-        through: {
-          quantity: line.quantity,
-          unityPrice: product.price
-        },
-        transaction
-      })
-    }
-
-    await transaction.commit()
-
-    const fullOrder = await Order.findByPk(order.id, {
-      include: [
-        {
-          model: Product,
-          as: 'products'
-        }
-      ]
-    })
-    return res.json(fullOrder)
-  } catch (err) {
-    await transaction.rollback()
-    return res.status(500).send(err)
-  }
+  // Use sequelizeSession to start a transaction
+  res.status(500).send('This function is to be implemented')
 }
 
 // TODO: Implement the destroy function that receives an orderId as path param and removes the associated order from the database.
