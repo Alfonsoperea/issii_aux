@@ -1,70 +1,102 @@
-import React from 'react'
-import { StyleSheet, View, Pressable } from 'react-native'
+import React, { useContext, useEffect, useState } from 'react'
+import { StyleSheet, FlatList, Pressable } from 'react-native'
+import { showMessage } from 'react-native-flash-message'
+import { getUserOrders } from '../../api/OrderEndpoints'
 import TextRegular from '../../components/TextRegular'
 import TextSemiBold from '../../components/TextSemiBold'
-import { brandPrimary, brandPrimaryTap } from '../../styles/GlobalStyles'
+import { AuthorizationContext } from '../../context/AuthorizationContext'
+import { flashStyle, flashTextStyle } from '../../styles/GlobalStyles'
 
-export default function OrdersScreen({ navigation }) {
-  return (
-    <View style={styles.container}>
-      <View style={styles.FRHeader}>
-        <TextSemiBold>FR5: Listing my confirmed orders</TextSemiBold>
-        <TextRegular>
-          A Customer will be able to check his/her confirmed orders, sorted from
-          the most recent to the oldest.
-        </TextRegular>
-        <TextSemiBold>FR8: Edit/delete order</TextSemiBold>
-        <TextRegular>
-          If the order is in the state pending, the customer can edit or remove
-          the products included or remove the whole order. The delivery address
-          can also be modified in the state pending. If the order is in the
-          state sent or delivered no edition is allowed.
-        </TextRegular>
-      </View>
+export default function OrdersScreen({ navigation, route }) {
+  const [orders, setOrders] = useState([])
+  const { loggedInUser } = useContext(AuthorizationContext)
+
+  useEffect(() => {
+    if (loggedInUser) {
+      fetchOrders()
+    } else {
+      setOrders([])
+    }
+  }, [loggedInUser, route])
+
+  const fetchOrders = async () => {
+    try {
+      const fetchedOrders = await getUserOrders()
+      setOrders(fetchedOrders)
+    } catch (error) {
+      showMessage({
+        message: `There was an error while retrieving your orders. ${error}`,
+        type: 'error',
+        style: flashStyle,
+        titleStyle: flashTextStyle
+      })
+    }
+  }
+
+  const renderOrder = ({ item }) => {
+    return (
       <Pressable
         onPress={() => {
-          navigation.navigate('OrderDetailScreen', {
-            id: Math.floor(Math.random() * 100)
-          })
+          navigation.navigate('OrderDetailScreen', { id: item.id })
         }}
         style={({ pressed }) => [
+          styles.card,
           {
-            backgroundColor: pressed ? brandPrimaryTap : brandPrimary
-          },
-          styles.button
+            backgroundColor: pressed ? '#f5eaea' : 'white'
+          }
         ]}
       >
-        <TextRegular textStyle={styles.text}>
-          Go to Order Detail Screen
+        <TextSemiBold>{item.restaurant?.name ?? 'Restaurant'}</TextSemiBold>
+        <TextRegular>
+          Created at: {new Date(item.createdAt).toLocaleString()}
         </TextRegular>
+        <TextRegular>Status: {item.status}</TextRegular>
+        <TextSemiBold textStyle={styles.price}>
+          Total: {Number(item.price).toFixed(2)}€
+        </TextSemiBold>
       </Pressable>
-    </View>
+    )
+  }
+
+  const renderEmptyOrdersList = () => {
+    return (
+      <TextRegular textStyle={styles.emptyList}>
+        {loggedInUser
+          ? 'You do not have confirmed orders yet.'
+          : 'Log in to see your orders.'}
+      </TextRegular>
+    )
+  }
+
+  return (
+    <FlatList
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      data={orders}
+      renderItem={renderOrder}
+      keyExtractor={item => item.id.toString()}
+      ListEmptyComponent={renderEmptyOrdersList}
+    />
   )
 }
 
 const styles = StyleSheet.create({
-  FRHeader: {
-    // TODO: remove this style and the related <View>. Only for clarification purposes
-    justifyContent: 'center',
-    alignItems: 'left',
-    margin: 50
-  },
   container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    margin: 50
+    flex: 1
   },
-  button: {
+  contentContainer: {
+    padding: 12
+  },
+  card: {
     borderRadius: 8,
-    height: 40,
-    margin: 12,
-    padding: 10,
-    width: '100%'
+    marginBottom: 10,
+    padding: 12
   },
-  text: {
-    fontSize: 16,
-    color: 'white',
-    textAlign: 'center'
+  price: {
+    marginTop: 4
+  },
+  emptyList: {
+    textAlign: 'center',
+    padding: 24
   }
 })

@@ -1,21 +1,34 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useMemo, useState } from 'react'
 import {
   StyleSheet,
   View,
   FlatList,
   ImageBackground,
-  Image
+  Image,
+  Pressable,
+  TextInput
 } from 'react-native'
 import { showMessage } from 'react-native-flash-message'
 import { getDetail } from '../../api/RestaurantEndpoints'
+import { createOrder } from '../../api/OrderEndpoints'
 import ImageCard from '../../components/ImageCard'
 import TextRegular from '../../components/TextRegular'
 import TextSemiBold from '../../components/TextSemiBold'
 import * as GlobalStyles from '../../styles/GlobalStyles'
 import { API_BASE_URL } from '@env'
+import { AuthorizationContext } from '../../context/AuthorizationContext'
 
 export default function RestaurantDetailScreen({ navigation, route }) {
   const [restaurant, setRestaurant] = useState({})
+  const [cartProducts, setCartProducts] = useState([])
+  const [address, setAddress] = useState('')
+  const { loggedInUser } = useContext(AuthorizationContext)
+
+  useEffect(() => {
+    if (loggedInUser?.address) {
+      setAddress(loggedInUser.address)
+    }
+  }, [loggedInUser])
 
   useEffect(() => {
     fetchRestaurantDetail()
@@ -24,27 +37,6 @@ export default function RestaurantDetailScreen({ navigation, route }) {
   const renderHeader = () => {
     return (
       <View>
-        <View style={styles.FRHeader}>
-          <TextSemiBold>FR2: Restaurants details and menu.</TextSemiBold>
-          <TextRegular>
-            Customers will be able to query restaurants details and the products
-            offered by them.
-          </TextRegular>
-          <TextSemiBold>
-            FR3: Add, edit and remove products to a new order.
-          </TextSemiBold>
-          <TextRegular>
-            A customer can add several products, and several units of a product
-            to a new order. Before confirming, customer can edit and remove
-            products. Once the order is confirmed, it cannot be edited or
-            removed.
-          </TextRegular>
-          <TextSemiBold>FR4: Confirm or dismiss new order.</TextSemiBold>
-          <TextRegular>
-            Customers will be able to confirm or dismiss the order before
-            sending it to the backend.
-          </TextRegular>
-        </View>
         <ImageBackground
           source={
             restaurant?.heroImage
@@ -102,6 +94,21 @@ export default function RestaurantDetailScreen({ navigation, route }) {
             Not available
           </TextRegular>
         )}
+        {item.availability && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.addButton,
+              {
+                backgroundColor: pressed
+                  ? GlobalStyles.brandGreenTap
+                  : GlobalStyles.brandGreen
+              }
+            ]}
+            onPress={() => addProductToCart(item)}
+          >
+            <TextRegular textStyle={styles.buttonText}>Add to cart</TextRegular>
+          </Pressable>
+        )}
       </ImageCard>
     )
   }
@@ -128,10 +135,201 @@ export default function RestaurantDetailScreen({ navigation, route }) {
     }
   }
 
+  const addProductToCart = product => {
+    setCartProducts(prev => {
+      const existingLine = prev.find(line => line.product.id === product.id)
+      if (!existingLine) {
+        return [...prev, { product, quantity: 1 }]
+      }
+      return prev.map(line =>
+        line.product.id === product.id
+          ? { ...line, quantity: line.quantity + 1 }
+          : line
+      )
+    })
+  }
+
+  const updateCartQuantity = (productId, delta) => {
+    setCartProducts(prev =>
+      prev
+        .map(line =>
+          line.product.id === productId
+            ? { ...line, quantity: line.quantity + delta }
+            : line
+        )
+        .filter(line => line.quantity > 0)
+    )
+  }
+
+  const clearCart = () => {
+    setCartProducts([])
+  }
+
+  const productsPrice = useMemo(
+    () =>
+      cartProducts.reduce(
+        (acc, line) => acc + line.quantity * Number(line.product.price),
+        0
+      ),
+    [cartProducts]
+  )
+
+  const shippingCosts = useMemo(() => {
+    return productsPrice > 10 ? 0 : Number(restaurant.shippingCosts ?? 0)
+  }, [productsPrice, restaurant.shippingCosts])
+
+  const orderTotal = useMemo(
+    () => productsPrice + shippingCosts,
+    [productsPrice, shippingCosts]
+  )
+
+  const confirmOrder = async () => {
+    if (!loggedInUser) {
+      showMessage({
+        message: 'You need to be logged in to place an order.',
+        type: 'warning',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+      return
+    }
+    if (cartProducts.length === 0) {
+      showMessage({
+        message: 'Add at least one product before confirming the order.',
+        type: 'warning',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+      return
+    }
+    if (!address.trim()) {
+      showMessage({
+        message: 'Delivery address is required.',
+        type: 'warning',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+      return
+    }
+
+    const orderData = {
+      createdAt: new Date(),
+      price: Number(orderTotal.toFixed(2)),
+      address: address.trim(),
+      shippingCosts: Number(shippingCosts.toFixed(2)),
+      restaurantId: route.params.id,
+      products: cartProducts.map(line => ({
+        productId: line.product.id,
+        quantity: line.quantity
+      }))
+    }
+
+    try {
+      await createOrder(orderData)
+      showMessage({
+        message: 'Order placed successfully.',
+        type: 'success',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+      clearCart()
+      navigation.navigate('My Orders')
+    } catch (error) {
+      showMessage({
+        message: `There was an error while creating the order. ${error}`,
+        type: 'error',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+    }
+  }
+
+  const renderCartLine = line => {
+    return (
+      <View key={line.product.id} style={styles.cartLine}>
+        <TextRegular textStyle={styles.cartLineTitle} numberOfLines={1}>
+          {line.product.name}
+        </TextRegular>
+        <View style={styles.quantityActions}>
+          <Pressable
+            style={styles.quantityButton}
+            onPress={() => updateCartQuantity(line.product.id, -1)}
+          >
+            <TextSemiBold>-</TextSemiBold>
+          </Pressable>
+          <TextSemiBold textStyle={styles.quantityValue}>
+            {line.quantity}
+          </TextSemiBold>
+          <Pressable
+            style={styles.quantityButton}
+            onPress={() => updateCartQuantity(line.product.id, 1)}
+          >
+            <TextSemiBold>+</TextSemiBold>
+          </Pressable>
+        </View>
+      </View>
+    )
+  }
+
+  const renderCartFooter = () => {
+    return (
+      <View style={styles.cartContainer}>
+        <TextSemiBold textStyle={styles.cartTitle}>Your new order</TextSemiBold>
+        {cartProducts.length === 0
+          ? (
+          <TextRegular>Your cart is empty.</TextRegular>
+            )
+          : (
+              cartProducts.map(renderCartLine)
+            )}
+        <TextRegular textStyle={styles.addressLabel}>Delivery address</TextRegular>
+        <TextInput
+          value={address}
+          onChangeText={setAddress}
+          style={styles.addressInput}
+          placeholder="Address"
+        />
+        <TextRegular>Products: {productsPrice.toFixed(2)}€</TextRegular>
+        <TextRegular>Shipping: {shippingCosts.toFixed(2)}€</TextRegular>
+        <TextSemiBold>Total: {orderTotal.toFixed(2)}€</TextSemiBold>
+
+        <View style={styles.cartButtons}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.cartButton,
+              {
+                backgroundColor: pressed
+                  ? GlobalStyles.brandBlueTap
+                  : GlobalStyles.brandBlue
+              }
+            ]}
+            onPress={clearCart}
+          >
+            <TextRegular textStyle={styles.buttonText}>Dismiss order</TextRegular>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.cartButton,
+              {
+                backgroundColor: pressed
+                  ? GlobalStyles.brandPrimaryTap
+                  : GlobalStyles.brandPrimary
+              }
+            ]}
+            onPress={confirmOrder}
+          >
+            <TextRegular textStyle={styles.buttonText}>Confirm order</TextRegular>
+          </Pressable>
+        </View>
+      </View>
+    )
+  }
+
   return (
     <FlatList
       ListHeaderComponent={renderHeader}
       ListEmptyComponent={renderEmptyProductsList}
+      ListFooterComponent={renderCartFooter}
       style={styles.container}
       data={restaurant.products}
       renderItem={renderProduct}
@@ -141,12 +339,6 @@ export default function RestaurantDetailScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  FRHeader: {
-    // TODO: remove this style and the related <View>. Only for clarification purposes
-    justifyContent: 'center',
-    alignItems: 'left',
-    margin: 50
-  },
   container: {
     flex: 1
   },
@@ -218,5 +410,75 @@ const styles = StyleSheet.create({
     bottom: 5,
     position: 'absolute',
     width: '90%'
+  },
+  addButton: {
+    borderRadius: 8,
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    alignSelf: 'flex-start'
+  },
+  buttonText: {
+    color: 'white'
+  },
+  cartContainer: {
+    margin: 12,
+    marginBottom: 24,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'white'
+  },
+  cartTitle: {
+    fontSize: 16,
+    marginBottom: 8
+  },
+  cartLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  cartLineTitle: {
+    flex: 1,
+    marginRight: 8
+  },
+  quantityActions: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  quantityButton: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#c8c8c8',
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  quantityValue: {
+    marginHorizontal: 8
+  },
+  addressLabel: {
+    marginTop: 10
+  },
+  addressInput: {
+    borderWidth: 1,
+    borderColor: '#c8c8c8',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 4,
+    marginBottom: 10
+  },
+  cartButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12
+  },
+  cartButton: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    width: '48%',
+    alignItems: 'center'
   }
 })

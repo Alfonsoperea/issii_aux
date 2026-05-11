@@ -1,78 +1,143 @@
-import { useEffect } from 'react'
-import { StyleSheet, View, Pressable } from 'react-native'
+import { useEffect, useState } from 'react'
+import { StyleSheet, View, FlatList } from 'react-native'
+import { showMessage } from 'react-native-flash-message'
+import { API_BASE_URL } from '@env'
+import { getAll } from '../../api/RestaurantEndpoints'
+import { getPopularProducts } from '../../api/ProductEndpoints'
+import ImageCard from '../../components/ImageCard'
 import TextSemiBold from '../../components/TextSemiBold'
 import TextRegular from '../../components/TextRegular'
 import * as GlobalStyles from '../../styles/GlobalStyles' //Imported globally to practise a different import style unlike that of RestaurantDetailScreen
 
 export default function RestaurantsScreen({ navigation, route }) {
-  // TODO: Create a state for storing the restaurants
+  const [restaurants, setRestaurants] = useState([])
+  const [topProducts, setTopProducts] = useState([])
 
   useEffect(() => {
-    // TODO: Fetch all restaurants and set them to state.
-    //      Notice that it is not required to be logged in.
-    // TODO: set restaurants to state
+    fetchRestaurants()
+    fetchPopularProducts()
   }, [route])
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.FRHeader}>
-        <TextSemiBold>FR1: Restaurants listing.</TextSemiBold>
-        <TextRegular>
-          List restaurants and enable customers to navigate to restaurant
-          details so they can create and place a new order
-        </TextRegular>
-        <TextSemiBold>FR7: Show top 3 products.</TextSemiBold>
-        <TextRegular>
-          Customers will be able to query top 3 products from all restaurants.
-          Top products are the most popular ones, in other words the best
-          sellers.
-        </TextRegular>
-      </View>
-      <Pressable
-        onPress={() => {
-          navigation.navigate('RestaurantDetailScreen', { id: 1 }) // TODO: Change this to the actual restaurant id as they are rendered as a FlatList
-        }}
-        style={({ pressed }) => [
-          {
-            backgroundColor: pressed
-              ? GlobalStyles.brandPrimaryTap
-              : GlobalStyles.brandPrimary
-          },
-          styles.button
-        ]}
+  const fetchRestaurants = async () => {
+    try {
+      const fetchedRestaurants = await getAll()
+      setRestaurants(fetchedRestaurants)
+    } catch (error) {
+      showMessage({
+        message: `There was an error while retrieving restaurants. ${error}`,
+        type: 'error',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+    }
+  }
+
+  const fetchPopularProducts = async () => {
+    try {
+      const fetchedTopProducts = await getPopularProducts()
+      setTopProducts(fetchedTopProducts)
+    } catch (error) {
+      showMessage({
+        message: `There was an error while retrieving top products. ${error}`,
+        type: 'error',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+    }
+  }
+
+  const renderRestaurant = ({ item }) => {
+    return (
+      <ImageCard
+        imageUri={item.logo ? { uri: `${API_BASE_URL}/${item.logo}` } : undefined}
+        title={item.name}
+        onPress={() => navigation.navigate('RestaurantDetailScreen', { id: item.id })}
       >
-        <TextRegular textStyle={styles.text}>
-          Go to Restaurant Detail Screen
-        </TextRegular>
-      </Pressable>
-    </View>
+        <TextRegular numberOfLines={2}>{item.description}</TextRegular>
+        <TextSemiBold>
+          Shipping:{' '}
+          <TextSemiBold textStyle={{ color: GlobalStyles.brandPrimary }}>
+            {item.shippingCosts.toFixed(2)}€
+          </TextSemiBold>
+        </TextSemiBold>
+      </ImageCard>
+    )
+  }
+
+  const renderHeader = () => {
+    return (
+      <View style={styles.header}>
+        <TextSemiBold textStyle={styles.sectionTitle}>
+          Top 3 best-selling products
+        </TextSemiBold>
+        {topProducts.length === 0
+          ? (
+          <TextRegular textStyle={styles.emptyTop}>
+            Top products are currently unavailable.
+          </TextRegular>
+            )
+          : (
+              topProducts.map(product => (
+            <View key={product.id} style={styles.topProductRow}>
+              <TextRegular numberOfLines={1} textStyle={styles.topProductName}>
+                {product.name}
+              </TextRegular>
+              <TextSemiBold>
+                {(product.soldProductCount ?? 0).toString()} sold
+              </TextSemiBold>
+            </View>
+              ))
+            )}
+      </View>
+    )
+  }
+
+  const renderEmptyRestaurantsList = () => {
+    return (
+      <TextRegular textStyle={styles.emptyList}>
+        There are no restaurants available right now.
+      </TextRegular>
+    )
+  }
+
+  return (
+    <FlatList
+      style={styles.container}
+      data={restaurants}
+      renderItem={renderRestaurant}
+      keyExtractor={item => item.id.toString()}
+      ListHeaderComponent={renderHeader}
+      ListEmptyComponent={renderEmptyRestaurantsList}
+    />
   )
 }
 
 const styles = StyleSheet.create({
-  FRHeader: {
-    // TODO: remove this style and the related <View>. Only for clarification purposes
-    justifyContent: 'center',
-    alignItems: 'left',
-    margin: 50
-  },
   container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    margin: 50
+    flex: 1
   },
-  button: {
-    borderRadius: 8,
-    height: 40,
-    margin: 12,
-    padding: 10,
-    width: '100%'
+  header: {
+    paddingHorizontal: 12,
+    paddingTop: 16
   },
-  text: {
+  sectionTitle: {
     fontSize: 16,
-    color: 'white',
-    textAlign: 'center'
+    marginBottom: 8
+  },
+  topProductRow: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  topProductName: {
+    flex: 1,
+    marginRight: 8
+  },
+  emptyTop: {
+    marginBottom: 12
   },
   emptyList: {
     textAlign: 'center',
