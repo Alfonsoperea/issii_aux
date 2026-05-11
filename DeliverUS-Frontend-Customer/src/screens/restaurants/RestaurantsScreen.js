@@ -78,14 +78,20 @@ export default function RestaurantsScreen({ navigation, route }) {
             )
           : (
               topProducts.map(product => (
-            <View key={product.id} style={styles.topProductRow}>
-              <TextRegular numberOfLines={1} textStyle={styles.topProductName}>
-                {product.name}
-              </TextRegular>
+            <ImageCard
+              key={product.id}
+              imageUri={
+                product.image
+                  ? { uri: `${API_BASE_URL}/${product.image}` }
+                  : undefined
+              }
+              title={product.name}
+            >
               <TextSemiBold>
                 {(product.soldProductCount ?? 0).toString()} sold
               </TextSemiBold>
-            </View>
+              <TextRegular>{Number(product.price).toFixed(2)}€</TextRegular>
+            </ImageCard>
               ))
             )}
       </View>
@@ -123,18 +129,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     marginBottom: 8
-  },
-  topProductRow: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 6,
-    flexDirection: 'row',
-    justifyContent: 'space-between'
-  },
-  topProductName: {
-    flex: 1,
-    marginRight: 8
   },
   emptyTop: {
     marginBottom: 12
